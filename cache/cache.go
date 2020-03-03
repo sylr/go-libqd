@@ -49,6 +49,30 @@ func GetCache(duration time.Duration, cleanupInterval time.Duration) cache.Cache
 	return caches[duration][cleanupInterval]
 }
 
+// GetMeteredCache returns a caching object
+func GetMeteredCache(duration time.Duration, cleanupInterval time.Duration) cache.Cacher {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if noopCaching {
+		if noopCacher == nil {
+			noopCacher = cache.NewNoopCacher(time.Minute, time.Minute)
+		}
+
+		return noopCacher
+	}
+
+	if _, ok := caches[duration]; !ok {
+		caches[duration] = make(map[time.Duration]cache.Cacher)
+	}
+
+	if _, ok := caches[duration][cleanupInterval]; !ok {
+		caches[duration][cleanupInterval] = cache.NewMetered(duration, cleanupInterval)
+	}
+
+	return caches[duration][cleanupInterval]
+}
+
 func resetCaches() {
 	caches = make(map[time.Duration]map[time.Duration]cache.Cacher)
 }
