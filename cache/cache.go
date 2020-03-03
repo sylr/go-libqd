@@ -48,3 +48,7 @@ func GetCache(duration time.Duration, cleanupInterval time.Duration) cache.Cache
 
 	return caches[duration][cleanupInterval]
 }
+
+func resetCaches() {
+	caches = make(map[time.Duration]map[time.Duration]cache.Cacher)
+}

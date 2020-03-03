@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestNewCacher(t *testing.T) {
+func TestGetCache(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(100 * 100)
 
@@ -25,13 +25,16 @@ func TestNewCacher(t *testing.T) {
 	wg.Wait()
 }
 
-func BenchmarkNewCacher(b *testing.B) {
-	wg := sync.WaitGroup{}
-	wg.Add(100 * 100)
+// -- benchmarks ---------------------------------------------------------------
 
-	for i := int64(1); i <= 100; i++ {
+func benchGetCache(b *testing.B, durations int, cleanups int) {
+	wg := sync.WaitGroup{}
+	wg.Add(durations * cleanups)
+
+	b.StartTimer()
+	for i := int64(1); i <= int64(durations); i++ {
 		duration := time.Duration(i) * time.Minute
-		for j := int64(1); j <= 100; j++ {
+		for j := int64(1); j <= int64(cleanups); j++ {
 			cleanup := time.Duration(j) * time.Minute
 
 			go func(duration time.Duration, cleanup time.Duration) {
@@ -42,4 +45,91 @@ func BenchmarkNewCacher(b *testing.B) {
 	}
 
 	wg.Wait()
+	b.StopTimer()
+}
+
+func BenchmarkGetCache(b *testing.B) {
+	b.StopTimer()
+	for i := 0; i < b.N; i++ {
+		resetCaches()
+		benchGetCache(b, 10, 20)
+	}
+}
+
+func benchGetCacheAdd(b *testing.B, rounds int) {
+	c := GetCache(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
+
+	b.StartTimer()
+	for i := 0; i < rounds; i++ {
+		c.Add(string(byte(i%100)), i, time.Minute)
+	}
+	b.StopTimer()
+}
+
+func BenchmarkGetCacheAdd(b *testing.B) {
+	b.StopTimer()
+	for i := 0; i < b.N; i++ {
+		resetCaches()
+		benchGetCacheAdd(b, 200)
+	}
+}
+
+func benchGetCacheIncrement(b *testing.B, rounds int) {
+	wg := sync.WaitGroup{}
+	c := GetCache(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
+
+	for i := 0; i < 10; i++ {
+		c.Add(string(byte(i%10)), i, time.Minute)
+	}
+
+	wg.Add(rounds)
+
+	b.StartTimer()
+	for i := 0; i < rounds; i++ {
+		go func(i int) {
+			c.IncrementInt(string(byte(i%10)), i)
+			wg.Done()
+		}(i)
+	}
+
+	wg.Wait()
+	b.StopTimer()
+}
+
+func BenchmarkGetCacheIncrement(b *testing.B) {
+	b.StopTimer()
+	for i := 0; i < b.N; i++ {
+		resetCaches()
+		benchGetCacheIncrement(b, 200)
+	}
+}
+
+func benchGetCacheDecrement(b *testing.B, rounds int) {
+	wg := sync.WaitGroup{}
+	c := GetCache(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
+
+	for i := 0; i < 10; i++ {
+		c.Add(string(byte(i%10)), i, time.Minute)
+	}
+
+	wg.Add(rounds)
+
+	b.StartTimer()
+	for i := 0; i < rounds; i++ {
+		go func(i int) {
+			c.DecrementInt(string(byte(i%10)), i)
+			wg.Done()
+		}(i)
+	}
+
+	wg.Wait()
+	b.StopTimer()
+}
+
+func BenchmarkGetCacheDecrement(b *testing.B) {
+	b.StopTimer()
+	for i := 0; i < b.N; i++ {
+		resetCaches()
+		benchGetCacheDecrement(b, 200)
+	}
 }
