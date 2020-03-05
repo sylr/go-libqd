@@ -51,10 +51,10 @@ func (wg *CancelableWaitGroup) Add(n int) {
 
 	for (wg.cur + n) > wg.cap {
 		wg.cond.Wait()
-	}
 
-	if atomic.LoadInt32(&wg.done) == 1 {
-		return
+		if atomic.LoadInt32(&wg.done) == 1 {
+			return
+		}
 	}
 
 	wg.cur += n
