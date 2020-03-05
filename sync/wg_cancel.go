@@ -43,7 +43,7 @@ func NewCancelableWaitGroup(context context.Context, cap int) *CancelableWaitGro
 // However, it does return if the context is canceled.
 func (wg *CancelableWaitGroup) Add(n int) {
 	if n > wg.cap {
-		panic("trying to add more than cap")
+		panic("libqd/sync: tryng to Add more than cap")
 	}
 
 	wg.mu.Lock()
@@ -66,7 +66,7 @@ func (wg *CancelableWaitGroup) Done() {
 	defer wg.mu.Unlock()
 
 	if wg.cur == 0 {
-		panic("called Done more than Add")
+		panic("libqd/sync: called Done more than Add")
 	}
 
 	if atomic.LoadInt32(&wg.done) == 1 {
