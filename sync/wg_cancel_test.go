@@ -68,7 +68,7 @@ func TestCancelableWaitGroupDone(t *testing.T) {
 		}
 	}
 
-	for i := cap; i >= -3; i-- {
+	for i := wg.cur; i > 0; i-- {
 		//t.Logf("Reverse Loop #%d: wg.Done()", i)
 
 		go doneFunc()
