@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 )
@@ -177,5 +178,45 @@ func BenchmarkCancelableWaitGroup(b *testing.B) {
 		for j := 0; j < cap; j++ {
 			wg.Done()
 		}
+	}
+}
+
+func BenchmarkCancelableWaitGroupConcurent(b *testing.B) {
+	// We test cap/2 iterations of Add() and Done() but because of concurrency
+	// we need the wg to be twice the number of iterations to not fall into the
+	// case where Done() is called more times than Add() and throws a panic.
+	const cap = 2000
+	ctx := context.Background()
+	wg := NewCancelableWaitGroup(ctx, cap)
+	w := sync.WaitGroup{}
+	b.StopTimer()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		w.Add(2)
+		wg.Add(cap / 2)
+
+		b.StartTimer()
+
+		go func() {
+			for j := 0; j < cap/2; j++ {
+				wg.Add(1)
+			}
+			w.Done()
+		}()
+
+		go func() {
+			for j := 0; j < cap/2; j++ {
+				wg.Done()
+			}
+			w.Done()
+		}()
+
+		w.Wait()
+
+		b.StopTimer()
+
+		wg.Add(-cap / 2)
+		wg.Wait()
 	}
 }
