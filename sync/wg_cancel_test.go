@@ -161,3 +161,21 @@ func TestCancelableWaitGroupWait(t *testing.T) {
 		t.Errorf("wg.Wait() hangs but it should not")
 	}
 }
+
+// -- benchmarks ---------------------------------------------------------------
+
+func BenchmarkCancelableWaitGroup(b *testing.B) {
+	const cap = 1000
+	ctx := context.Background()
+	wg := NewCancelableWaitGroup(ctx, cap)
+
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < cap; j++ {
+			wg.Add(1)
+		}
+
+		for j := 0; j < cap; j++ {
+			wg.Done()
+		}
+	}
+}

@@ -79,3 +79,20 @@ func TestBoundedWaitGroupDone(t *testing.T) {
 		}
 	}
 }
+
+// -- benchmarks ---------------------------------------------------------------
+
+func BenchmarkBoundedWaitGroup(b *testing.B) {
+	const cap = 1000
+	wg := NewBoundedWaitGroup(cap)
+
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < cap; j++ {
+			wg.Add(1)
+		}
+
+		for j := 0; j < cap; j++ {
+			wg.Done()
+		}
+	}
+}
