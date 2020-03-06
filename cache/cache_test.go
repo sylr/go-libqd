@@ -29,17 +29,19 @@ func TestGetCache(t *testing.T) {
 
 // -- benchmarks ---------------------------------------------------------------
 
+type getCacheFunc func(time.Duration, time.Duration) cache.Cacher
+
 var (
 	getCacheFuncs = []struct {
 		name string
-		fun  func(time.Duration, time.Duration) cache.Cacher
+		fun  getCacheFunc
 	}{
 		{"Cache", GetCache},
 		{"MeteredCache", GetMeteredCache},
 	}
 )
 
-func benchGetCache(b *testing.B, f func(time.Duration, time.Duration) cache.Cacher, durations int, cleanups int) {
+func benchGetCache(b *testing.B, f getCacheFunc, durations int, cleanups int) {
 	wg := sync.WaitGroup{}
 	wg.Add(durations * cleanups)
 
@@ -72,7 +74,7 @@ func BenchmarkGetCache(b *testing.B) {
 	}
 }
 
-func benchGetCacheAdd(b *testing.B, f func(time.Duration, time.Duration) cache.Cacher, rounds int) {
+func benchGetCacheAdd(b *testing.B, f getCacheFunc, rounds int) {
 	c := f(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
 
 	b.StartTimer()
@@ -94,7 +96,7 @@ func BenchmarkGetCacheAdd(b *testing.B) {
 	}
 }
 
-func benchGetCacheIncrement(b *testing.B, f func(time.Duration, time.Duration) cache.Cacher, rounds int) {
+func benchGetCacheIncrement(b *testing.B, f getCacheFunc, rounds int) {
 	wg := sync.WaitGroup{}
 	c := f(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
 
@@ -129,7 +131,7 @@ func BenchmarkGetCacheIncrement(b *testing.B) {
 	b.StopTimer()
 }
 
-func benchGetCacheDecrement(b *testing.B, f func(time.Duration, time.Duration) cache.Cacher, rounds int) {
+func benchGetCacheDecrement(b *testing.B, f getCacheFunc, rounds int) {
 	wg := sync.WaitGroup{}
 	c := f(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
 
