@@ -30,14 +30,14 @@ func NewBoundedWaitGroup(cap int) BoundedWaitGroup {
 // If counter + delta is greater that the cap of the BoundedWaitGroup then Add
 // would block until there is enough slots made available in the the WaitGroup.
 func (bwg *BoundedWaitGroup) Add(delta int) {
-	// Delta < 0
-	for i := 0; i > delta; i-- {
-		<-bwg.ch
-	}
-
-	// Delta > 0
-	for i := 0; i < delta; i++ {
-		bwg.ch <- struct{}{}
+	if delta > 0 {
+		for i := 0; i < delta; i++ {
+			bwg.ch <- struct{}{}
+		}
+	} else {
+		for i := 0; i > delta; i-- {
+			<-bwg.ch
+		}
 	}
 
 	bwg.wg.Add(delta)
