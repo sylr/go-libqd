@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 )
 
 type CancelableWaitGroup struct {
@@ -11,8 +12,7 @@ type CancelableWaitGroup struct {
 	cap     int
 	cur     int
 	context context.Context
-	done    bool
-	doneMu  sync.RWMutex
+	done    int32
 }
 
 // NewCancelableWaitGroup returns a Waiter that can be canceled wia a context.
@@ -23,8 +23,7 @@ func NewCancelableWaitGroup(context context.Context, cap int) *CancelableWaitGro
 		mu:      sync.Mutex{},
 		cap:     cap,
 		context: context,
-		done:    false,
-		doneMu:  sync.RWMutex{},
+		done:    0,
 	}
 
 	wg.cond = sync.NewCond(&wg.mu)
@@ -32,10 +31,7 @@ func NewCancelableWaitGroup(context context.Context, cap int) *CancelableWaitGro
 	go func() {
 		select {
 		case <-wg.context.Done():
-			wg.doneMu.Lock()
-			defer wg.doneMu.Unlock()
-			wg.done = true
-
+			atomic.SwapInt32(&wg.done, 1)
 			wg.cond.Broadcast()
 		}
 	}()
@@ -46,21 +42,19 @@ func NewCancelableWaitGroup(context context.Context, cap int) *CancelableWaitGro
 // Add adds n tasks and does not return until wg.cur + n <= wg.cap.
 // However, it does return if the context is canceled.
 func (wg *CancelableWaitGroup) Add(n int) {
+	if n > wg.cap {
+		panic("libqd/sync: tryng to Add more than cap")
+	}
+
 	wg.mu.Lock()
 	defer wg.mu.Unlock()
 
 	for (wg.cur + n) > wg.cap {
 		wg.cond.Wait()
-	}
 
-	done := func() bool {
-		wg.doneMu.RLock()
-		defer wg.doneMu.RUnlock()
-		return wg.done
-	}()
-
-	if done {
-		return
+		if atomic.LoadInt32(&wg.done) == 1 {
+			return
+		}
 	}
 
 	wg.cur += n
@@ -72,16 +66,10 @@ func (wg *CancelableWaitGroup) Done() {
 	defer wg.mu.Unlock()
 
 	if wg.cur == 0 {
-		return
+		panic("libqd/sync: called Done more than Add")
 	}
 
-	done := func() bool {
-		wg.doneMu.RLock()
-		defer wg.doneMu.RUnlock()
-		return wg.done
-	}()
-
-	if done {
+	if atomic.LoadInt32(&wg.done) == 1 {
 		return
 	}
 
@@ -98,13 +86,7 @@ func (wg *CancelableWaitGroup) Wait() {
 	for wg.cur > 0 {
 		wg.cond.Wait()
 
-		done := func() bool {
-			wg.doneMu.RLock()
-			defer wg.doneMu.RUnlock()
-			return wg.done
-		}()
-
-		if done {
+		if atomic.LoadInt32(&wg.done) == 1 {
 			return
 		}
 	}
