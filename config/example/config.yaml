@@ -1,0 +1,9 @@
+port: 80
+verbose:
+- true
+- true
+- true
+- true
+- true
+- true
+- true
