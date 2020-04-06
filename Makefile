@@ -12,22 +12,31 @@ endif
 # -- test ----------------------------------------------------------------------
 
 .PHONY: test bench
+.ONESHELL: test bench
 
 test:
-	go test $(GO_TEST_FLAGS) ./...
+	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
+		cd $(CURDIR); \
+		cd $$dir; \
+		go test $(GO_TEST_FLAGS) ./...; \
+	done
 
 bench:
-	@go test $(GO_TEST_FLAGS) -bench=.* ./...
+	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
+		cd $(CURDIR); \
+		cd $$dir; \
+		go test $(GO_TEST_FLAGS) -bench=.* ./...; \
+	done
 
 # -- go mod --------------------------------------------------------------------
 
-.PHONY: go-mod-download go-mod-download go-mod-verify
+.PHONY: go-mod-verify
+.ONESHELL: go-mod-verify
 
-go-mod-download:
-	@go mod download
-
-go-mod-tidy:
-	@go mod tidy
-
-go-mod-verify: go-mod-download
-	@git diff --quiet go.* || git diff --exit-code go.*
+go-mod-verify:
+	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
+		cd $(CURDIR); \
+		cd $$dir; \
+		go mod download
+		git diff --quiet go.* || git diff --exit-code go.*
+	done
