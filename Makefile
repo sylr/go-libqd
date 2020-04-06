@@ -1,12 +1,23 @@
+DEBUG                ?= 0
+VERBOSE              ?= 0
+
+ifneq ($(DEBUG),0)
+GO_TEST_FLAGS        += -count=1
+endif
+ifneq ($(VERBOSE),0)
+GO_TEST_FLAGS        += -v
+GO_TEST_BENCH_FLAGS  += -v
+endif
+
 # -- test ----------------------------------------------------------------------
 
 .PHONY: test bench
 
 test:
-	@go test ./...
+	go test $(GO_TEST_FLAGS) ./...
 
 bench:
-	@go test -bench=.* ./...
+	@go test $(GO_TEST_FLAGS) -bench=.* ./...
 
 # -- go mod --------------------------------------------------------------------
 

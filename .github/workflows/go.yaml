@@ -15,4 +15,4 @@ jobs:
     - name: Verify go mod
       run: make go-mod-verify
     - name: Test
-      run: make test
+      run: make test VERBOSE=1
