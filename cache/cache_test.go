@@ -79,6 +79,7 @@ func benchGetCacheAdd(b *testing.B, f getCacheFunc, rounds int) {
 
 	b.StartTimer()
 	for i := 0; i < rounds; i++ {
+		//nolint:errcheck
 		c.Add(string(byte(i%100)), i, time.Minute)
 	}
 	b.StopTimer()
@@ -101,6 +102,7 @@ func benchGetCacheIncrement(b *testing.B, f getCacheFunc, rounds int) {
 	c := f(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
 
 	for i := 0; i < 10; i++ {
+		//nolint:errcheck
 		c.Add(string(byte(i%10)), i, time.Minute)
 	}
 
@@ -109,6 +111,7 @@ func benchGetCacheIncrement(b *testing.B, f getCacheFunc, rounds int) {
 	b.StartTimer()
 	for i := 0; i < rounds; i++ {
 		go func(i int) {
+			//nolint:errcheck
 			c.IncrementInt(string(byte(i%10)), i)
 			wg.Done()
 		}(i)
@@ -136,6 +139,7 @@ func benchGetCacheDecrement(b *testing.B, f getCacheFunc, rounds int) {
 	c := f(time.Duration(b.N)*time.Minute, time.Duration(b.N)*time.Minute)
 
 	for i := 0; i < 10; i++ {
+		//nolint:errcheck
 		c.Add(string(byte(i%10)), i, time.Minute)
 	}
 
@@ -144,6 +148,7 @@ func benchGetCacheDecrement(b *testing.B, f getCacheFunc, rounds int) {
 	b.StartTimer()
 	for i := 0; i < rounds; i++ {
 		go func(i int) {
+			//nolint:errcheck
 			c.DecrementInt(string(byte(i%10)), i)
 			wg.Done()
 		}(i)

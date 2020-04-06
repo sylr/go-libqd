@@ -29,6 +29,7 @@ func NewCancelableWaitGroup(context context.Context, cap int) *CancelableWaitGro
 	wg.cond = sync.NewCond(&wg.mu)
 
 	go func() {
+		//nolint:gosimple
 		select {
 		case <-wg.context.Done():
 			atomic.SwapInt32(&wg.done, 1)
