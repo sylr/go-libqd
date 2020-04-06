@@ -1,0 +1,10 @@
+# ignore everything
+*
+# do not ignore file with extensions
+!*.*
+# do not ignore directories
+!*/
+
+.vscode
+**.orig
+**.rej
