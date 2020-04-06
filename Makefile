@@ -30,13 +30,22 @@ bench:
 
 # -- go mod --------------------------------------------------------------------
 
-.PHONY: go-mod-verify
-.ONESHELL: go-mod-verify
+.PHONY: go-mod-verify go-mod-tidy
+.ONESHELL: go-mod-verify go-mod-tidy
+.SHELLFLAGS: -e
 
 go-mod-verify:
 	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
 		cd $(CURDIR); \
 		cd $$dir; \
-		go mod download
-		git diff --quiet go.* || git diff --exit-code go.*
+		go mod download; \
+		git diff --quiet go.* || git diff --exit-code go.* || exit 1; \
+	done
+
+go-mod-tidy:
+	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
+		cd $(CURDIR); \
+		cd $$dir; \
+		go mod download; \
+		go mod tidy; \
 	done
