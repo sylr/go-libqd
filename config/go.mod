@@ -1,4 +1,4 @@
-module github.com/sylr/go-libqd/conf
+module github.com/sylr/go-libqd/config
 
 go 1.14
 
