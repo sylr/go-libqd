@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -71,7 +72,7 @@ func (m *Manager) GetConfig(name interface{}) Config {
 }
 
 // NewConfig ...
-func (m *Manager) NewConfig(name interface{}, conf Config) error {
+func (m *Manager) NewConfig(ctx context.Context, name interface{}, conf Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -118,7 +119,7 @@ func (m *Manager) NewConfig(name interface{}, conf Config) error {
 		return fmt.Errorf("Error while applying conf: %w", err)
 	}
 
-	go m.watchers[name].watchConfigFile()
+	go m.watchers[name].watchConfigFile(ctx)
 
 	// Sleep a bit to let the watchConfigFile go routine the time to watch
 	// the configuration file it it supposed to.
