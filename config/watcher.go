@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -80,7 +81,7 @@ func (w *watcher) loadConfig(conf Config) error {
 	return nil
 }
 
-func (w *watcher) watchConfigFile() {
+func (w *watcher) watchConfigFile(ctx context.Context) {
 	// local logger
 	llogger := w.logger.WithFields(log.Fields{
 		"_func": "watchConfigFile",
@@ -116,6 +117,8 @@ func (w *watcher) watchConfigFile() {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case event, ok := <-watcher.Events:
 			if !ok {
 				llogger.Error("fsnotify: error")
