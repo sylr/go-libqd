@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -58,6 +59,10 @@ func (l *LogWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestMyConfig(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Create temporary file for config
 	tmpFile, err := ioutil.TempFile(os.TempDir(), "libqd-config-")
 
@@ -103,7 +108,7 @@ func TestMyConfig(t *testing.T) {
 	// Init configuration
 	confManager := GetManager()
 	confManager.logger = logger
-	err = confManager.NewConfig(nil, myConfig)
+	err = confManager.NewConfig(ctx, nil, myConfig)
 
 	if err != nil {
 		t.Error(err)
