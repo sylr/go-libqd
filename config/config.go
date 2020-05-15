@@ -17,7 +17,7 @@ var (
 
 // -----------------------------------------------------------------------------
 
-// Config is an interface describing functions needed by this module
+// Config is an interface describing functions needed by this module.
 type Config interface {
 	// Copy returns a copy of the current struct.
 	Copy() Config
@@ -59,7 +59,7 @@ type Manager struct {
 	mu       sync.RWMutex
 }
 
-// GetConfig returns
+// GetConfig returns an existing configuration, nil otherwise.
 func (m *Manager) GetConfig(name interface{}) Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -71,7 +71,8 @@ func (m *Manager) GetConfig(name interface{}) Config {
 	return nil
 }
 
-// NewConfig ...
+// NewConfig returns a new initialized configuration. This will create a new
+// goroutine which watches the configuration file for updates.
 func (m *Manager) NewConfig(ctx context.Context, name interface{}, conf Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

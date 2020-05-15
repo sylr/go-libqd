@@ -15,8 +15,8 @@ type CancelableWaitGroup struct {
 	done    int32
 }
 
-// NewCancelableWaitGroup returns a Waiter that can be canceled wia a context.
-// If the context is canceled thatn Waiter.Wait() will return even if Waiter.Done()
+// NewCancelableWaitGroup returns a Waiter that can be canceled via a context.
+// If the context is canceled then Waiter.Wait() will return even if Waiter.Done()
 // has not been called as much as Waiter.Add().
 func NewCancelableWaitGroup(context context.Context, cap int) *CancelableWaitGroup {
 	wg := &CancelableWaitGroup{
@@ -61,7 +61,7 @@ func (wg *CancelableWaitGroup) Add(n int) {
 	wg.cur += n
 }
 
-// Done decreases wg.cur
+// Done decreases the number of running tasks.
 func (wg *CancelableWaitGroup) Done() {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()
@@ -79,7 +79,7 @@ func (wg *CancelableWaitGroup) Done() {
 	wg.cond.Signal()
 }
 
-// Wait waits unitl wg.cur == 0 or if the context is canceled.
+// Wait waits until the number of tasks is 0 or until the context is canceled.
 func (wg *CancelableWaitGroup) Wait() {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()

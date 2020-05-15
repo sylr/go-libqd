@@ -15,7 +15,7 @@ func NewWaiter(cap int) Waiter {
 }
 
 // BoundedWaitGroup is a wait group which has a limit boundary meaning it will
-// wait for Done() to be called before releasing Add(n) if the limit has been reached
+// wait for Done() to be called before releasing Add(n) if the limit has been reached.
 type BoundedWaitGroup struct {
 	wg sync.WaitGroup
 	ch chan struct{}
