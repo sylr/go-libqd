@@ -11,7 +11,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	flags "github.com/jessevdk/go-flags"
-	log "github.com/sirupsen/logrus"
 	json "github.com/tailscale/hujson"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -154,7 +153,7 @@ func (w *watcher) readConfigCLIOptions(conf Config) {
 		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
 			os.Exit(0)
 		} else {
-			log.Fatal(err)
+			w.logger.Fatalf("%v", err)
 			os.Exit(1)
 		}
 	}
