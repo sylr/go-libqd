@@ -17,53 +17,48 @@ import (
 )
 
 type watcher struct {
-	logger *log.Logger
-	name   interface{}
-	config Config
+	manager *Manager
+	logger  Logger
+	name    interface{}
+	config  Config
 }
 
 // reload configuration
 func (w *watcher) reload() {
 	newConfig := w.config.Copy()
 
-	// local logger
-	llogger := w.logger.WithFields(log.Fields{
-		"_func": "reload",
-	})
-
 	// Load config from cli args and then from config file if
 	err := w.loadConfig(newConfig)
 
 	if err != nil {
-		llogger.Errorf("Error while loading conf: %v", err)
+		w.logger.Errorf("Error while loading conf: %v", err)
 		return
 	}
 
-	// Validate new config
-	errs := newConfig.Validate(w.config)
+	// Execute validators
+	var errs []error
+	w.manager.runValidators(w.name, w.config, newConfig)
 
 	if len(errs) > 0 {
 		for _, err := range errs {
-			llogger.Errorf("Error while validating new conf: %v", err)
+			w.logger.Errorf("Error while validating new conf: %v", err)
 		}
 
 		err = errors.New("New configuration not applied because error(s) have been found")
-		llogger.Error(err)
+		w.logger.Errorf("%x", err)
 		return
 	}
 
-	// Apply config
-	err = newConfig.Apply(w.config)
+	// Execute appliers
+	err = w.manager.runAppliers(w.name, w.config, newConfig)
 
 	if err != nil {
-		llogger.Errorf("Error while applying conf: %v", err)
-		return
+		w.logger.Errorf("Error while applying new conf: %v", err)
 	}
 
 	// update current configuration
 	w.config = newConfig
-	manager := GetManager()
-	manager.broadcastNewConfig(w.name)
+	w.manager.broadcastNewConfig(w.name)
 }
 
 func (w *watcher) loadConfig(conf Config) error {
@@ -82,34 +77,29 @@ func (w *watcher) loadConfig(conf Config) error {
 }
 
 func (w *watcher) watchConfigFile(ctx context.Context) {
-	// local logger
-	llogger := w.logger.WithFields(log.Fields{
-		"_func": "watchConfigFile",
-	})
-
 	configFile := w.config.ConfigFile()
 
-	llogger.Debugf("Watching config files %s", configFile)
+	w.logger.Debugf("Watching config files %s", configFile)
 
 	watcher, err := fsnotify.NewWatcher()
 
 	if err != nil {
-		llogger.Fatal(err)
+		w.logger.Fatalf("%x", err)
 	}
 
 	err = watcher.Add(configFile)
 
 	if err != nil {
-		llogger.Fatal(err)
+		w.logger.Fatalf("%x", err)
 	}
 
 	if len(os.Getenv("KUBERNETES_PORT")) > 0 {
 		dir := filepath.Dir(configFile)
-		llogger.Infof("In kubernetes context, adding %s to watch list", dir)
+		w.logger.Infof("In kubernetes context, adding %s to watch list", dir)
 		err := watcher.Add(dir)
 
 		if err != nil {
-			llogger.Fatal(err)
+			w.logger.Fatalf("%x", err)
 		}
 	}
 
@@ -121,21 +111,21 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 			return
 		case event, ok := <-watcher.Events:
 			if !ok {
-				llogger.Error("fsnotify: error")
+				w.logger.Errorf("fsnotify: error %x", event)
 				break
 			}
 
-			llogger.Debugf("fsnotify: %s -> %s", event.Name, event.Op.String())
+			w.logger.Debugf("fsnotify: %s -> %s", event.Name, event.Op.String())
 
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				if event.Name == configFile {
-					llogger.Debugf("config: file changed")
+					w.logger.Debugf("config: file changed")
 				}
 			} else if event.Op&fsnotify.Create == fsnotify.Create {
 				if event.Name == configFile {
-					llogger.Debugf("config: file created")
+					w.logger.Debugf("config: file created")
 				} else if filepath.Base(event.Name) == "..data" {
-					llogger.Debugf("config: configmap volume updated")
+					w.logger.Debugf("config: configmap volume updated")
 				} else {
 					break
 				}
@@ -143,7 +133,7 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 				break
 			}
 
-			llogger.Info("config: reloading config")
+			w.logger.Infof("config: reloading config")
 
 			// Reload configuration
 			w.reload()
@@ -151,7 +141,7 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 			if !ok {
 				return
 			}
-			llogger.Errorf("fsnotify: %s", err)
+			w.logger.Errorf("fsnotify: %s", err)
 		}
 	}
 }

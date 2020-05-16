@@ -2,31 +2,28 @@ package config
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
 type MyConfig struct {
-	Logger     *logrus.Logger `yaml:"-"`
-	File       string         `                   short:"f" long:"config"   description:"Yaml config"`
-	Verbose    []bool         `yaml:"verbose"     short:"v" long:"verbose"  description:"Show verbose debug information"`
-	JSONOutput bool           `yaml:"json_output" short:"j" long:"json"     description:"Use json format for output"`
-	Version    bool           `                             long:"version"  description:"Show version"`
+	Logger  Logger `yaml:"-"`
+	File    string `               short:"f" long:"config"  description:"Yaml config"`
+	Verbose []bool `yaml:"verbose" short:"v" long:"verbose" description:"Show verbose debug information"`
+	Version bool   `                         long:"version" description:"Show version"`
 }
 
 func (c MyConfig) Copy() Config {
 	return &MyConfig{
-		Logger:     c.Logger,
-		File:       c.File,
-		Verbose:    c.Verbose,
-		JSONOutput: c.JSONOutput,
-		Version:    c.Version,
+		Logger:  c.Logger,
+		File:    c.File,
+		Verbose: c.Verbose,
+		Version: c.Version,
 	}
 }
 
@@ -34,28 +31,24 @@ func (c MyConfig) ConfigFile() string {
 	return c.File
 }
 
-func (c MyConfig) Validate(currentConfig Config) []error {
-	return nil
+type testLogger struct {
+	*testing.T
 }
 
-func (c MyConfig) Apply(currentConfig Config) error {
-	if c.JSONOutput {
-		c.Logger.SetFormatter(&logrus.JSONFormatter{})
-	} else {
-		c.Logger.SetFormatter(&logrus.TextFormatter{})
-	}
-	return nil
+func (t *testLogger) Tracef(format string, vals ...interface{}) {
+	t.Logf("go-libqd/config: "+format, vals...)
 }
 
-type LogWriter struct {
-	t *testing.T
+func (t *testLogger) Debugf(format string, vals ...interface{}) {
+	t.Logf("go-libqd/config: "+format, vals...)
 }
 
-func (l *LogWriter) Write(p []byte) (n int, err error) {
-	str := strings.TrimSpace(string(p))
-	l.t.Log(str)
+func (t *testLogger) Infof(format string, vals ...interface{}) {
+	t.Logf("go-libqd/config: "+format, vals...)
+}
 
-	return len(str), nil
+func (t *testLogger) Warnf(format string, vals ...interface{}) {
+	t.Logf("go-libqd/config: "+format, vals...)
 }
 
 func TestMyConfig(t *testing.T) {
@@ -74,16 +67,13 @@ func TestMyConfig(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	// Logger and test log wrapper
-	logger := logrus.New()
-	logger.SetOutput(&LogWriter{t})
-	logger.SetLevel(logrus.TraceLevel)
+	logger := &testLogger{t}
 
 	myConfig := &MyConfig{
 		// We need to define it otherwise yaml.Marshal will set it to empty
-		File:       tmpFile.Name(),
-		Logger:     logger,
-		Verbose:    []bool{true, true, true, true, true, true},
-		JSONOutput: false,
+		File:    tmpFile.Name(),
+		Logger:  logger,
+		Verbose: []bool{true, true, true, true, true, true},
 	}
 
 	yml, err := yaml.Marshal(myConfig)
@@ -105,19 +95,84 @@ func TestMyConfig(t *testing.T) {
 		"test", "-vvvvvv", "-f", tmpFile.Name(),
 	}
 
-	// Init configuration
-	confManager := GetManager()
-	confManager.logger = logger
-	err = confManager.NewConfig(ctx, nil, myConfig)
+	// Some variable
+	a := 0
+
+	validator := func(currentConfig Config, newConfig Config) []error {
+		var errs []error
+		var ok bool
+		var currentConf *MyConfig
+
+		if currentConfig != nil {
+			currentConf, ok = currentConfig.(*MyConfig)
+
+			if !ok {
+				errs = append(errs, errors.New("Can not cast currentConfig to MyConfig"))
+				return errs
+			}
+		}
+
+		newConf, ok := newConfig.(*MyConfig)
+
+		if !ok {
+			errs = append(errs, errors.New("Can not cast newConfig to MyConfig"))
+			return errs
+		}
+
+		if len(newConf.Verbose) > 6 {
+			errs = append(errs, errors.New("Verbose can not be greater than 6"))
+		}
+
+		if currentConf != nil {
+			if currentConf.File != newConf.File {
+				errs = append(errs, errors.New("File is immutable"))
+			}
+		}
+
+		return errs
+	}
+
+	applier := func(currentConfig Config, newConfig Config) error {
+		var err error
+		var ok bool
+		var currentConf *MyConfig
+
+		if currentConfig != nil {
+			currentConf, ok = currentConfig.(*MyConfig)
+
+			if !ok {
+				return errors.New("Can not cast currentConfig to MyConfig")
+			}
+		}
+
+		newConf, ok := newConfig.(*MyConfig)
+
+		if !ok {
+			return errors.New("Can not cast newConfig to MyConfig")
+		}
+
+		// Increment `a` only after first reload
+		if currentConf != nil && newConf != nil {
+			a++
+		}
+
+		return err
+	}
+
+	confManager := GetManager(logger)
+	confManager.AddValidators(nil, validator)
+	confManager.AddAppliers(nil, applier)
+
+	// Launch config
+	err = confManager.MakeConfig(ctx, nil, myConfig)
 
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	if _, ok := logger.Formatter.(*logrus.TextFormatter); !ok {
-		t.Error("Log formatter should be a *logrus.TextFormatter")
-		return
+	if a != 0 {
+		t.Errorf("a=%d but should be 0", a)
 	}
 
 	m := confManager.GetConfig(nil).(*MyConfig)
@@ -126,8 +181,7 @@ func TestMyConfig(t *testing.T) {
 
 	c := confManager.NewConfigChan(nil)
 
-	// Write yaml in the config file with JSON output switch on
-	myConfig.JSONOutput = true
+	myConfig.Version = true
 	yml, err = yaml.Marshal(myConfig)
 
 	if err != nil {
@@ -151,9 +205,7 @@ func TestMyConfig(t *testing.T) {
 		return
 	}
 
-	// Check that the config has been applied
-	if _, ok := logger.Formatter.(*logrus.JSONFormatter); !ok {
-		t.Error("Log formatter should be a *logrus.JSONFormatter")
-		return
+	if a != 1 {
+		t.Errorf("a=%d but should be 1", a)
 	}
 }
