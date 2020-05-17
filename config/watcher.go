@@ -24,7 +24,7 @@ type watcher struct {
 
 // reload configuration
 func (w *watcher) reload() {
-	newConfig := w.config.Copy()
+	newConfig := w.config.DeepCopyConfig()
 
 	// Load config from cli args and then from config file if exists
 	err := w.loadConfig(newConfig)

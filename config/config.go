@@ -15,8 +15,8 @@ var (
 
 // Config is an interface describing functions needed by this module.
 type Config interface {
-	// Copy returns a copy of the current struct.
-	Copy() Config
+	// DeepCopyConfig returns a copy of the current struct.
+	DeepCopyConfig() Config
 	// ConfigFile returns the path of the config file.
 	ConfigFile() string
 }
