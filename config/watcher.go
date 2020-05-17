@@ -26,7 +26,7 @@ type watcher struct {
 func (w *watcher) reload() {
 	newConfig := w.config.Copy()
 
-	// Load config from cli args and then from config file if
+	// Load config from cli args and then from config file if exists
 	err := w.loadConfig(newConfig)
 
 	if err != nil {
@@ -35,8 +35,7 @@ func (w *watcher) reload() {
 	}
 
 	// Execute validators
-	var errs []error
-	w.manager.runValidators(w.name, w.config, newConfig)
+	errs := w.manager.runValidators(w.name, w.config, newConfig)
 
 	if len(errs) > 0 {
 		for _, err := range errs {
@@ -44,7 +43,7 @@ func (w *watcher) reload() {
 		}
 
 		err = errors.New("New configuration not applied because error(s) have been found")
-		w.logger.Errorf("%x", err)
+		w.logger.Errorf("%v", err)
 		return
 	}
 
@@ -118,13 +117,13 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				if event.Name == configFile {
-					w.logger.Debugf("config: file changed")
+					w.logger.Debugf("Config file changed")
 				}
 			} else if event.Op&fsnotify.Create == fsnotify.Create {
 				if event.Name == configFile {
-					w.logger.Debugf("config: file created")
+					w.logger.Debugf("Config file created")
 				} else if filepath.Base(event.Name) == "..data" {
-					w.logger.Debugf("config: configmap volume updated")
+					w.logger.Debugf("Configmap volume updated")
 				} else {
 					break
 				}
@@ -132,7 +131,7 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 				break
 			}
 
-			w.logger.Infof("config: reloading config")
+			w.logger.Infof("Reloading config")
 
 			// Reload configuration
 			w.reload()
@@ -183,10 +182,12 @@ func (w *watcher) loadFile(conf Config, filename string) error {
 		return err
 	}
 
-	switch path.Ext(filename) {
-	case "yaml", "yml":
+	ext := path.Ext(filename)
+
+	switch ext {
+	case ".yaml", ".yml":
 		err = w.parseYAML(conf, content)
-	case "json":
+	case ".json":
 		err = w.parseJSON(conf, content)
 	}
 

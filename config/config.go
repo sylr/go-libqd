@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -100,6 +99,13 @@ func (m *Manager) MakeConfig(ctx context.Context, name interface{}, config Confi
 		config:  config,
 	}
 
+	// Load config from cli args and then from config file if exists
+	err = m.watchers[name].loadConfig(config)
+
+	if err != nil {
+		return err
+	}
+
 	// Execute validators
 	errs := m.runValidators(name, nil, config)
 
@@ -108,7 +114,7 @@ func (m *Manager) MakeConfig(ctx context.Context, name interface{}, config Confi
 			m.logger.Errorf("Error while validating new conf: %v", err)
 		}
 
-		err = errors.New("New configuration not applied because error(s) have been found")
+		err = fmt.Errorf("New configuration not applied because error(s) have been found")
 		return err
 	}
 
