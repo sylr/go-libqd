@@ -15,7 +15,7 @@ endif
 .ONESHELL: test bench lint
 
 test:
-	for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
+	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
 		cd $(CURDIR)/$$dir; \
 		go test $(GO_TEST_FLAGS) ./...; \
 	done
