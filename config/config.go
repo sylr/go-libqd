@@ -66,8 +66,10 @@ func (m *Manager) GetConfig(name interface{}) Config {
 	return nil
 }
 
-// MakeConfig returns a new initialized configuration. This will create a new
-// goroutine which watches the configuration file for updates.
+// MakeConfig creates a named configuration. If config.ConfigFile() returns anything
+// but an empty string it will spawn a goroutine which will watch for changes
+// in the file. The file does not have to exists, it can be created after the
+// config has been created.
 func (m *Manager) MakeConfig(ctx context.Context, name interface{}, config Config) error {
 	var err error
 
@@ -115,11 +117,14 @@ func (m *Manager) MakeConfig(ctx context.Context, name interface{}, config Confi
 		return err
 	}
 
-	go m.watchers[name].watchConfigFile(ctx)
+	// Spawn a goroutine to watch the config file it has been defined
+	if len(config.ConfigFile()) > 0 {
+		go m.watchers[name].watchConfigFile(ctx)
 
-	// Sleep a bit to let the watchConfigFile go routine the time to watch
-	// the configuration file it is supposed to.
-	time.Sleep(time.Millisecond)
+		// Sleep a bit to let the watchConfigFile go routine the time to watch
+		// the configuration file it is supposed to.
+		time.Sleep(time.Millisecond)
+	}
 
 	return err
 }
