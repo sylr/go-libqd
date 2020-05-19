@@ -24,10 +24,11 @@ type Config interface {
 // Chan is a channel within which pointers to a new configuration will be sent.
 type Chan chan Config
 
-// Validator is a function type which will validate that a new configuration
+// Validator is a function type which will ensure that the content of the config
+// file is valid and can be applied
 type Validator func(currentConfig Config, newConfig Config) []error
 
-// Applier is a function type which will apply a new configuration
+// Applier is a function type which will apply the new configuration
 type Applier func(currentConfig Config, newConfig Config) error
 
 // -----------------------------------------------------------------------------
