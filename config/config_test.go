@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -173,14 +172,14 @@ func TestMyConfig(t *testing.T) {
 			currentConf, ok = currentConfig.(*MyConfig)
 
 			if !ok {
-				return errors.New("Can not cast currentConfig to (*MyConfig)")
+				return fmt.Errorf("Can not cast currentConfig to (*MyConfig)")
 			}
 		}
 
 		newConf, ok := newConfig.(*MyConfig)
 
 		if !ok {
-			return errors.New("Can not cast newConfig to (*MyConfig)")
+			return fmt.Errorf("Can not cast newConfig to (*MyConfig)")
 		}
 
 		// Increment `a` only after first reload

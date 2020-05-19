@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -43,7 +42,7 @@ func (w *watcher) reload() {
 			w.logger.Errorf("Error while validating new conf: %v", err)
 		}
 
-		err = errors.New("New configuration not applied because error(s) have been found")
+		err = fmt.Errorf("New configuration not applied because error(s) have been found")
 		w.logger.Errorf("%v", err)
 		return
 	}
