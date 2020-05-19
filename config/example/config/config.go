@@ -7,10 +7,10 @@ package config
 // MyAppConfiguration implements github.com/sylr/go-libqd/config.Config
 type MyAppConfiguration struct {
 	Reloads  int32  `yaml:"-"`
-	File     string `                           short:"f" long:"config"`
-	Verbose  []bool `yaml:"verbose"             short:"v" long:"verbose"`
-	Version  bool   `                                     long:"version"`
-	HTTPPort int    `yaml:"port"    json:"port" short:"p" long:"port"`
+	Version  bool   `                                                       long:"version"`
+	File     string `                                             short:"f" long:"config"`
+	Verbose  []bool `yaml:"verbose" json:"verbose" toml:"verbose" short:"v" long:"verbose"`
+	HTTPPort int    `yaml:"port"    json:"port"    toml:"port"    short:"p" long:"port"`
 }
 
 func (c *MyAppConfiguration) ConfigFile() string {

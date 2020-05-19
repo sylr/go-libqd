@@ -46,7 +46,8 @@ func (l *Logger) Fatalf(format string, vals ...interface{}) {
 }
 
 func main() {
-	logger := logrus.New()
+	logrus.SetLevel(logrus.TraceLevel)
+	logger := logrus.StandardLogger()
 	qdlogger := &Logger{l: logger}
 
 	conf := &config.MyAppConfiguration{
@@ -58,7 +59,7 @@ func main() {
 
 	// mutex to prevent data race around conf
 	mu := sync.RWMutex{}
-	cm := configMutex{&mu}
+	cm := configMutex{&mu, qdlogger}
 
 	// Manager
 	configManager := qdconfig.GetManager(qdlogger)
@@ -109,6 +110,7 @@ func main() {
 
 type configMutex struct {
 	*sync.RWMutex
+	l *Logger
 }
 
 func (cm *configMutex) configValidator(currentConfig qdconfig.Config, newConfig qdconfig.Config) []error {
@@ -116,7 +118,7 @@ func (cm *configMutex) configValidator(currentConfig qdconfig.Config, newConfig 
 	var newConf *config.MyAppConfiguration
 	var ok bool
 
-	// currentConfig is nil the first time the function will be called
+	// currentConfig is nil the first time the validator is called
 	if currentConfig != nil {
 		currentConf, ok = currentConfig.(*config.MyAppConfiguration)
 
@@ -131,6 +133,9 @@ func (cm *configMutex) configValidator(currentConfig qdconfig.Config, newConfig 
 		return []error{fmt.Errorf("Can not cast newConfig to (*config.MyAppConfiguration)")}
 	}
 
+	// ---------------------------------------------------------------------
+	// Here begins the actual validation of the values of newConfig
+	// ---------------------------------------------------------------------
 	var errs []error
 
 	if currentConfig == nil {
@@ -151,7 +156,7 @@ func (cm *configMutex) configApplier(currentConfig qdconfig.Config, newConfig qd
 	var newConf *config.MyAppConfiguration
 	var ok bool
 
-	// currentConfig is nil the first time the function will be called
+	// currentConfig is nil the first time the validator is called
 	if currentConfig != nil {
 		currentConf, ok = currentConfig.(*config.MyAppConfiguration)
 
@@ -166,9 +171,27 @@ func (cm *configMutex) configApplier(currentConfig qdconfig.Config, newConfig qd
 		return fmt.Errorf("Can not cast newConfig to (*config.MyAppConfiguration)")
 	}
 
+	switch len(newConf.Verbose) {
+	case 1:
+		logrus.SetLevel(logrus.FatalLevel)
+	case 2:
+		logrus.SetLevel(logrus.ErrorLevel)
+	case 3:
+		logrus.SetLevel(logrus.WarnLevel)
+	case 4:
+		logrus.SetLevel(logrus.InfoLevel)
+	case 5:
+		logrus.SetLevel(logrus.DebugLevel)
+	case 6:
+		fallthrough
+	default:
+		logrus.SetLevel(logrus.TraceLevel)
+	}
+
 	if currentConf != nil {
 		cm.Lock()
 		newConf.Reloads = newConf.Reloads + 1
+		cm.l.Debugf("Incrementing conf.Reloads to `%d`", newConf.Reloads)
 		cm.Unlock()
 	}
 
