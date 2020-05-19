@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	toml "github.com/BurntSushi/toml"
-	"github.com/fsnotify/fsnotify"
+	fsnotify "github.com/fsnotify/fsnotify"
 	flags "github.com/jessevdk/go-flags"
 	json "github.com/tailscale/hujson"
 	yaml "gopkg.in/yaml.v3"
@@ -78,7 +78,7 @@ func (w *watcher) loadConfig(conf Config) error {
 func (w *watcher) watchConfigFile(ctx context.Context) {
 	configFile := w.config.ConfigFile()
 
-	w.logger.Debugf("Watching config files %s", configFile)
+	w.logger.Debugf("Watching config file `%s`", configFile)
 
 	watcher, err := fsnotify.NewWatcher()
 
@@ -94,7 +94,7 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 
 	if len(os.Getenv("KUBERNETES_PORT")) > 0 {
 		dir := filepath.Dir(configFile)
-		w.logger.Infof("In kubernetes context, adding %s to watch list", dir)
+		w.logger.Infof("In kubernetes context, adding `%s` to the watch list", dir)
 		err := watcher.Add(dir)
 
 		if err != nil {
@@ -108,13 +108,20 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case event, ok := <-watcher.Events:
+		case err, ok := <-watcher.Errors:
 			if !ok {
-				w.logger.Errorf("fsnotify: error %x", event)
-				break
+				w.logger.Errorf("fsnotify: watcher.Errors channel has been closed")
+				return
 			}
 
-			w.logger.Debugf("fsnotify: %s -> %s", event.Name, event.Op.String())
+			w.logger.Errorf("fsnotify: %s", err)
+		case event, ok := <-watcher.Events:
+			if !ok {
+				w.logger.Errorf("fsnotify: watcher.Events channel has been closed")
+				return
+			}
+
+			w.logger.Tracef("fsnotify: %s -> %s", event.Name, event.Op.String())
 
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				if event.Name == configFile {
@@ -136,11 +143,6 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 
 			// Reload configuration
 			w.reload()
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			w.logger.Errorf("fsnotify: %s", err)
 		}
 	}
 }
