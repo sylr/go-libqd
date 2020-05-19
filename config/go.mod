@@ -10,8 +10,3 @@ require (
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200506231410-2ff61e1afc86
 )
-
-replace (
-	github.com/niemeyer/pretty => github.com/sylr/go-pretty v0.0.0-20200517092739-d3252c08b3ba
-	gopkg.in/yaml.v3 => github.com/sylr/go-yaml v0.0.0-20200517101938-4dbbae02f875
-)
