@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 
+	toml "github.com/BurntSushi/toml"
 	"github.com/fsnotify/fsnotify"
 	flags "github.com/jessevdk/go-flags"
 	json "github.com/tailscale/hujson"
@@ -189,6 +190,8 @@ func (w *watcher) loadFile(conf Config, filename string) error {
 		err = w.parseYAML(conf, content)
 	case ".json":
 		err = w.parseJSON(conf, content)
+	case ".toml":
+		err = w.parseTOML(conf, content)
 	}
 
 	if err != nil {
@@ -212,6 +215,17 @@ func (w *watcher) parseYAML(conf Config, bytes []byte) error {
 // parseJSON parses the JSON input into a Config.
 func (w *watcher) parseJSON(conf Config, bytes []byte) error {
 	err := json.Unmarshal([]byte(bytes), conf)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parseTOML parses the TOML input into a Config.
+func (w *watcher) parseTOML(conf Config, bytes []byte) error {
+	err := toml.Unmarshal([]byte(bytes), conf)
 
 	if err != nil {
 		return err
