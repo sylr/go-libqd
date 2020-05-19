@@ -9,61 +9,55 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/fsnotify/fsnotify"
+	toml "github.com/BurntSushi/toml"
+	fsnotify "github.com/fsnotify/fsnotify"
 	flags "github.com/jessevdk/go-flags"
-	log "github.com/sirupsen/logrus"
 	json "github.com/tailscale/hujson"
 	yaml "gopkg.in/yaml.v3"
 )
 
 type watcher struct {
-	logger *log.Logger
-	name   interface{}
-	config Config
+	manager *Manager
+	logger  Logger
+	name    interface{}
+	config  Config
 }
 
 // reload configuration
 func (w *watcher) reload() {
-	newConfig := w.config.Copy()
+	newConfig := w.config.DeepCopyConfig()
 
-	// local logger
-	llogger := w.logger.WithFields(log.Fields{
-		"_func": "reload",
-	})
-
-	// Load config from cli args and then from config file if
+	// Load config from cli args and then from config file if exists
 	err := w.loadConfig(newConfig)
 
 	if err != nil {
-		llogger.Errorf("Error while loading conf: %v", err)
+		w.logger.Errorf("Error while loading conf: %v", err)
 		return
 	}
 
-	// Validate new config
-	errs := newConfig.Validate(w.config)
+	// Execute validators
+	errs := w.manager.runValidators(w.name, w.config, newConfig)
 
 	if len(errs) > 0 {
 		for _, err := range errs {
-			llogger.Errorf("Error while validating new conf: %v", err)
+			w.logger.Errorf("Error while validating new conf: %v", err)
 		}
 
 		err = errors.New("New configuration not applied because error(s) have been found")
-		llogger.Error(err)
+		w.logger.Errorf("%v", err)
 		return
 	}
 
-	// Apply config
-	err = newConfig.Apply(w.config)
+	// Execute appliers
+	err = w.manager.runAppliers(w.name, w.config, newConfig)
 
 	if err != nil {
-		llogger.Errorf("Error while applying conf: %v", err)
-		return
+		w.logger.Errorf("Error while applying new conf: %v", err)
 	}
 
 	// update current configuration
 	w.config = newConfig
-	manager := GetManager()
-	manager.broadcastNewConfig(w.name)
+	w.manager.broadcastNewConfig(w.name)
 }
 
 func (w *watcher) loadConfig(conf Config) error {
@@ -82,34 +76,29 @@ func (w *watcher) loadConfig(conf Config) error {
 }
 
 func (w *watcher) watchConfigFile(ctx context.Context) {
-	// local logger
-	llogger := w.logger.WithFields(log.Fields{
-		"_func": "watchConfigFile",
-	})
-
 	configFile := w.config.ConfigFile()
 
-	llogger.Debugf("Watching config files %s", configFile)
+	w.logger.Debugf("Watching config file `%s`", configFile)
 
 	watcher, err := fsnotify.NewWatcher()
 
 	if err != nil {
-		llogger.Fatal(err)
+		w.logger.Fatalf("%x", err)
 	}
 
 	err = watcher.Add(configFile)
 
 	if err != nil {
-		llogger.Fatal(err)
+		w.logger.Fatalf("%x", err)
 	}
 
 	if len(os.Getenv("KUBERNETES_PORT")) > 0 {
 		dir := filepath.Dir(configFile)
-		llogger.Infof("In kubernetes context, adding %s to watch list", dir)
+		w.logger.Infof("In kubernetes context, adding `%s` to the watch list", dir)
 		err := watcher.Add(dir)
 
 		if err != nil {
-			llogger.Fatal(err)
+			w.logger.Fatalf("%x", err)
 		}
 	}
 
@@ -119,23 +108,30 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case event, ok := <-watcher.Events:
+		case err, ok := <-watcher.Errors:
 			if !ok {
-				llogger.Error("fsnotify: error")
-				break
+				w.logger.Errorf("fsnotify: watcher.Errors channel has been closed")
+				return
 			}
 
-			llogger.Debugf("fsnotify: %s -> %s", event.Name, event.Op.String())
+			w.logger.Errorf("fsnotify: %s", err)
+		case event, ok := <-watcher.Events:
+			if !ok {
+				w.logger.Errorf("fsnotify: watcher.Events channel has been closed")
+				return
+			}
+
+			w.logger.Tracef("fsnotify: %s -> %s", event.Name, event.Op.String())
 
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				if event.Name == configFile {
-					llogger.Debugf("config: file changed")
+					w.logger.Debugf("Config file changed")
 				}
 			} else if event.Op&fsnotify.Create == fsnotify.Create {
 				if event.Name == configFile {
-					llogger.Debugf("config: file created")
+					w.logger.Debugf("Config file created")
 				} else if filepath.Base(event.Name) == "..data" {
-					llogger.Debugf("config: configmap volume updated")
+					w.logger.Debugf("Configmap volume updated")
 				} else {
 					break
 				}
@@ -143,15 +139,10 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 				break
 			}
 
-			llogger.Info("config: reloading config")
+			w.logger.Infof("Reloading config")
 
 			// Reload configuration
 			w.reload()
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			llogger.Errorf("fsnotify: %s", err)
 		}
 	}
 }
@@ -164,7 +155,7 @@ func (w *watcher) readConfigCLIOptions(conf Config) {
 		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
 			os.Exit(0)
 		} else {
-			log.Fatal(err)
+			w.logger.Fatalf("%v", err)
 			os.Exit(1)
 		}
 	}
@@ -194,11 +185,15 @@ func (w *watcher) loadFile(conf Config, filename string) error {
 		return err
 	}
 
-	switch path.Ext(filename) {
-	case "yaml", "yml":
+	ext := path.Ext(filename)
+
+	switch ext {
+	case ".yaml", ".yml":
 		err = w.parseYAML(conf, content)
-	case "json":
+	case ".json":
 		err = w.parseJSON(conf, content)
+	case ".toml":
+		err = w.parseTOML(conf, content)
 	}
 
 	if err != nil {
@@ -222,6 +217,17 @@ func (w *watcher) parseYAML(conf Config, bytes []byte) error {
 // parseJSON parses the JSON input into a Config.
 func (w *watcher) parseJSON(conf Config, bytes []byte) error {
 	err := json.Unmarshal([]byte(bytes), conf)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parseTOML parses the TOML input into a Config.
+func (w *watcher) parseTOML(conf Config, bytes []byte) error {
+	err := toml.Unmarshal([]byte(bytes), conf)
 
 	if err != nil {
 		return err

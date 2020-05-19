@@ -2,9 +2,13 @@
 *
 # do not ignore file with extensions
 !*.*
+# do not ignore Makefile
+!Makefile
 # do not ignore directories
 !*/
 
 .vscode
 **.orig
 **.rej
+**.svg
+**.png
