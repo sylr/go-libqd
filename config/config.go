@@ -30,16 +30,6 @@ type Validator func(currentConfig Config, newConfig Config) []error
 // Applier is a function type which will apply a new configuration
 type Applier func(currentConfig Config, newConfig Config) error
 
-// Logger is the interface that describe the logger that this module will use.
-type Logger interface {
-	Tracef(string, ...interface{})
-	Debugf(string, ...interface{})
-	Infof(string, ...interface{})
-	Warnf(string, ...interface{})
-	Errorf(string, ...interface{})
-	Fatalf(string, ...interface{})
-}
-
 // -----------------------------------------------------------------------------
 
 // GetManager returns the Manager that will give you access to all your configs.
