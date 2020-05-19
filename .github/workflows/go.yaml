@@ -16,3 +16,5 @@ jobs:
       run: make go-mod-verify
     - name: Test
       run: make test VERBOSE=1
+    - name: Test
+      run: make lint
