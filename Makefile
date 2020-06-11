@@ -9,6 +9,8 @@ GO_TEST_FLAGS        += -v
 GO_TEST_BENCH_FLAGS  += -v
 endif
 
+GO_TOOLS_GOLANGCI_LINT ?= $(shell go env GOPATH)/bin/golangci-lint
+
 # -- test ----------------------------------------------------------------------
 
 .PHONY: test bench
@@ -26,11 +28,21 @@ bench:
 		go test $(GO_TEST_FLAGS) -bench=.* ./...; \
 	done
 
-lint:
+lint: $(GO_TOOLS_GOLANGCI_LINT)
 	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
 		cd $(CURDIR)/$$dir; \
-		golangci-lint run; \
+		$(GO_TOOLS_GOLANGCI_LINT) run; \
 	done
+
+# -- tools ---------------------------------------------------------------------
+
+.PHONY: tools
+
+tools: $(GO_TOOLS_GOLANGCI_LINT)
+
+$(GO_TOOLS_GOLANGCI_LINT):
+	GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.27.0
+
 
 # -- go mod --------------------------------------------------------------------
 
