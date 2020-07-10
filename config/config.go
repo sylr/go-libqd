@@ -216,7 +216,9 @@ func (m *Manager) runAppliers(name interface{}, currentConfig Config, newConfig 
 	for _, applier := range m.appliers[name] {
 		err := applier(currentConfig, newConfig)
 
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
