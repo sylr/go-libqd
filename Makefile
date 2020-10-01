@@ -74,6 +74,11 @@ tags:
 	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
 		PRETTY_DIR=$$(sed -e "s#^./##" -e "s#/\$$##" <<<"$$dir"); \
 		LAST_TAG=$$(cd $$dir; git describe --abbrev=0 --match="$$PRETTY_DIR/*" | sed -e "s#^$$PRETTY_DIR/##"); \
+		CHANGED_FILES=$$(git diff --name-only --ignore-all-space --ignore-space-change $$PRETTY_DIR/$$LAST_TAG..HEAD -- $$PRETTY_DIR); \
+		if [ -z "$$CHANGED_FILES" ]; then \
+			echo "$$PRETTY_DIR does not need tagging"; \
+			continue; \
+		fi; \
 		NEXT_TAG=$$(cd $$dir; gorelease -base=$$LAST_TAG | grep 'Suggested version' | sed -e 's#Suggested version: .* (with tag \(.*\))#\1#'); \
 		git rev-parse $$NEXT_TAG -- > /dev/null 2>&1; \
 		if [ "$$?" -gt "0" ]; then \
