@@ -4,11 +4,14 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.14", "1.15"]
     steps:
-    - name: Set up Go 1.14
+    - name: Set up Go ${{ matrix.go }}
       uses: actions/setup-go@v1
       with:
-        go-version: 1.14
+        go-version: ${{ matrix.go }}
       id: go
     - name: Check out code into the Go module directory
       uses: actions/checkout@v1
