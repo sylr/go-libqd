@@ -2,7 +2,9 @@ package sync
 
 import (
 	"context"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -35,7 +37,7 @@ func TestCancelableWaitGroupAdd(t *testing.T) {
 	}
 }
 
-func TestCancelableWaitGroupDone(t *testing.T) {
+func TestCancelableWaitGroupDone1(t *testing.T) {
 	cap := 8
 	context := context.Background()
 	wg := NewCancelableWaitGroup(context, cap)
@@ -84,10 +86,9 @@ func TestCancelableWaitGroupDone(t *testing.T) {
 	}
 }
 
-func TestCancelableWaitGroupWait(t *testing.T) {
+func TestCancelableWaitGroupDone2(t *testing.T) {
 	cap := 8
 	ctx := context.Background()
-	ctx, cancelFunc := context.WithCancel(ctx)
 
 	wg := NewCancelableWaitGroup(ctx, cap)
 	c := make(chan int, cap*3)
@@ -132,15 +133,47 @@ func TestCancelableWaitGroupWait(t *testing.T) {
 
 	// Test wg.Done()
 	for i := 0; i < cap; i++ {
-		//t.Logf("Loop #%d: wg.Done() wg.cur=%d", i, wg.cur)
 		doneFunc()
+		t.Logf("Loop #%d: wg.Done() -> wg.cur=%d wg.finalized=%d", i, wg.cur, atomic.LoadInt32(&wg.finalized))
 	}
 
 	select {
 	case <-r:
-		t.Logf("wg.Wait() returned, it should have")
+		t.Logf("wg.Wait() returned, it should have -> wg.cur=%d wg.finalized=%d", wg.cur, atomic.LoadInt32(&wg.finalized))
 	case <-time.After(100 * time.Millisecond):
 		t.Errorf("wg.Wait() hangs but it should not")
+	}
+
+	// Test that wg.Add() panics after the wg has been finalized
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("wg.Add() panic'ed, it should have")
+		} else {
+			t.Errorf("wg.Add() did not panic, it should have")
+		}
+	}()
+
+	// This should panic
+	addFunc(1)
+}
+
+func TestCancelableWaitGroupCancel(t *testing.T) {
+	cap := 8
+	ctx := context.Background()
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	wg := NewCancelableWaitGroup(ctx, cap)
+	c := make(chan int, cap*3)
+	r := make(chan int, cap*3)
+
+	addFunc := func(i int) {
+		wg.Add(i)
+		c <- 1
+	}
+
+	waitFunc := func() {
+		wg.Wait()
+		r <- 1
 	}
 
 	// Test wg.Wait() that should return after cancel
@@ -158,8 +191,59 @@ func TestCancelableWaitGroupWait(t *testing.T) {
 	select {
 	case <-r:
 		t.Logf("wg.Wait() returned, it should have")
-	case <-time.After(1000 * time.Millisecond):
+	case <-time.After(2000 * time.Millisecond):
 		t.Errorf("wg.Wait() hangs but it should not")
+	}
+
+	// Test that wg.Add() panics after the wg has been finalized
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("wg.Add() panic'ed, it should have")
+		} else {
+			t.Errorf("wg.Add() did not panic, it should have")
+		}
+	}()
+
+	// This should panic
+	addFunc(1)
+}
+
+func TestCancelableWaitGORoutineLeakage(t *testing.T) {
+	ctx := context.Background()
+
+	wgs := make([]Waiter, 100)
+
+	goroutines := runtime.NumGoroutine()
+
+	for i := 0; i < cap(wgs); i++ {
+		wgs[i] = NewCancelableWaitGroup(ctx, 8)
+	}
+
+	for i := 0; i < cap(wgs); i++ {
+		wgs[i].Add(1)
+		wgs[i].Add(2)
+		wgs[i].Add(3)
+	}
+
+	for i := 0; i < cap(wgs); i++ {
+		wgs[i].Done()
+		wgs[i].Done()
+		wgs[i].Done()
+		wgs[i].Done()
+		wgs[i].Done()
+		wgs[i].Done()
+	}
+
+	for i := 0; i < cap(wgs); i++ {
+		wgs[i].Wait()
+	}
+
+	time.Sleep(time.Millisecond)
+
+	goroutines2 := runtime.NumGoroutine()
+
+	if goroutines != goroutines2 {
+		t.Errorf("Number of goroutines %d is greater than it should be (%d)", goroutines2, goroutines)
 	}
 }
 
