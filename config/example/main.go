@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"sync"
@@ -98,9 +99,10 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		mu.RLock()
 		defer mu.RUnlock()
+		html := template.New(fmt.Sprintf("%# v", pretty.Formatter(conf)))
 
-		w.Header().Add("Content-Type", "text/plain")
-		w.Write([]byte(fmt.Sprintf("%# v", pretty.Formatter(conf))))
+		w.Header().Set("Content-Type", "text/plain")
+		html.Execute(w, nil)
 	})
 
 	addr := fmt.Sprintf("127.0.0.1:%d", conf.HTTPPort)
