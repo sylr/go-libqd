@@ -99,7 +99,9 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		mu.RLock()
 		defer mu.RUnlock()
-		html := template.New(fmt.Sprintf("%# v", pretty.Formatter(conf)))
+
+		html := template.New("")
+		html.Parse(fmt.Sprintf("%# v", pretty.Formatter(conf)))
 
 		w.Header().Set("Content-Type", "text/plain")
 		html.Execute(w, nil)
