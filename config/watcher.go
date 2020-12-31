@@ -16,6 +16,8 @@ import (
 )
 
 type watcher struct {
+	*fsnotify.Watcher
+
 	manager *Manager
 	logger  Logger
 	name    interface{}
@@ -79,13 +81,7 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 
 	w.logger.Debugf("Watching config file `%s`", configFile)
 
-	watcher, err := fsnotify.NewWatcher()
-
-	if err != nil {
-		w.logger.Fatalf("%x", err)
-	}
-
-	err = watcher.Add(configFile)
+	err := w.Add(configFile)
 
 	if err != nil {
 		w.logger.Fatalf("%x", err)
@@ -94,27 +90,27 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 	if len(os.Getenv("KUBERNETES_PORT")) > 0 {
 		dir := filepath.Dir(configFile)
 		w.logger.Infof("In kubernetes context, adding `%s` to the watch list", dir)
-		err := watcher.Add(dir)
+		err := w.Add(dir)
 
 		if err != nil {
 			w.logger.Fatalf("%x", err)
 		}
 	}
 
-	defer watcher.Close()
+	defer w.Close()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case err, ok := <-watcher.Errors:
+		case err, ok := <-w.Errors:
 			if !ok {
 				w.logger.Errorf("fsnotify: watcher.Errors channel has been closed")
 				return
 			}
 
 			w.logger.Errorf("fsnotify: %s", err)
-		case event, ok := <-watcher.Events:
+		case event, ok := <-w.Events:
 			if !ok {
 				w.logger.Errorf("fsnotify: watcher.Events channel has been closed")
 				return

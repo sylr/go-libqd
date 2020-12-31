@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 var (
@@ -60,8 +62,20 @@ func (m *Manager) GetConfig(name interface{}) Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if c, ok := m.watchers[name]; ok {
-		return c.config
+	if w, ok := m.watchers[name]; ok {
+		return w.config
+	}
+
+	return nil
+}
+
+// GetWatcher returns an existing configuration, nil otherwise.
+func (m *Manager) GetWatcher(name interface{}) *watcher {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if w, ok := m.watchers[name]; ok {
+		return w
 	}
 
 	return nil
@@ -85,12 +99,13 @@ func (m *Manager) MakeConfig(ctx context.Context, name interface{}, config Confi
 		return fmt.Errorf("The configuration `%v` already exists", name)
 	}
 
-	m.watchers[name] = &watcher{
-		manager: m,
-		logger:  m.logger,
-		name:    name,
-		config:  config,
+	fsnotify, err := fsnotify.NewWatcher()
+
+	if err != nil {
+		return err
 	}
+
+	m.watchers[name] = &watcher{fsnotify, m, m.logger, name, config}
 
 	// Load config from cli args and then from config file if exists
 	err = m.watchers[name].loadConfig(config)
@@ -171,7 +186,7 @@ func (m *Manager) AddValidators(name interface{}, validators ...Validator) {
 	}
 }
 
-// AddValidator ...
+// addValidator ...
 func (m *Manager) addValidator(name interface{}, validator Validator) {
 	if m.validators == nil {
 		m.validators = make(map[interface{}][]Validator)
@@ -190,7 +205,7 @@ func (m *Manager) AddAppliers(name interface{}, appliers ...Applier) {
 	}
 }
 
-// AddApplier ...
+// addApplier ...
 func (m *Manager) addApplier(name interface{}, applier Applier) {
 	if m.appliers == nil {
 		m.appliers = make(map[interface{}][]Applier)
