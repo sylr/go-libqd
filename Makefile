@@ -17,10 +17,12 @@ GO_TOOLS_GOLANGCI_LINT ?= $(shell go env GOPATH)/bin/golangci-lint
 .ONESHELL: test bench lint
 
 test:
-	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
+	@FAILED=0; \
+	for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
 		cd $(CURDIR)/$$dir; \
-		go test $(GO_TEST_FLAGS) ./...; \
-	done
+		go test $(GO_TEST_FLAGS) ./... || FAILED=$$((FAILED+1)); \
+	done; \
+	test $$FAILED -eq 0 || exit 1
 
 bench:
 	@for dir in $$(find . -name go.mod ! -path \*/example/\* -exec dirname {} \;); do \
