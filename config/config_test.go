@@ -111,6 +111,8 @@ func TestMyConfig(t *testing.T) {
 		return
 	}
 
+	time.Sleep(10 * time.Microsecond)
+
 	// Override go test os.Args
 	os.Args = []string{
 		"test", "-vvvvvv", "-f", tmpFile.Name(),
