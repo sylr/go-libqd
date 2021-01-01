@@ -130,6 +130,10 @@ func (w *watcher) watchConfigFile(ctx context.Context) {
 				} else {
 					break
 				}
+			} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+				w.logger.Debugf("Config file removed, probably your editor replacing file when saving")
+				w.Remove(event.Name)
+				w.Add(event.Name)
 			} else {
 				break
 			}
